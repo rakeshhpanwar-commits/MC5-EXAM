@@ -24,7 +24,7 @@ function getMainSpreadsheet() {
     catch (err) { throw new Error("Configured MAIN_SPREADSHEET_ID is not accessible. Bind this script to the Student Google Sheet."); }
   }
 
-  throw new Error("Student backend is not bound to a Google Sheet. Open the NEW Student Google Sheet, go to Extensions > Apps Script, paste this backend there, save it, run setupStudentBackend once, and redeploy the Web App.");
+  throw new Error("Student backend is not bound to a Google Sheet. Open the NEW Student Google Sheet, go to Extensions > Apps Script, paste this backend there, save it, run setupStudentBackend once, and then reload the portal.");
 }
 
 function setupStudentBackend() {
@@ -87,7 +87,7 @@ function resetMainSpreadsheetBinding() {
   PropertiesService.getScriptProperties().deleteProperty("MAIN_SPREADSHEET_ID");
   return getMainSpreadsheet().getId();
 }
- 
+  
 function getAdminPassword() {
   // Admin password is stored persistently in this Apps Script project.
   // Default is the previously working ASTI admin password until the administrator changes it.
@@ -100,7 +100,7 @@ function setAdminPassword_(newPass) {
   PropertiesService.getScriptProperties().setProperty("ADMIN_PASSWORD", newPass);
   return true;
 }
- 
+  
 function isMatch(targetVal, userExam) {
   if (!targetVal) return true;
   var t = String(targetVal).toUpperCase().trim();
@@ -109,14 +109,14 @@ function isMatch(targetVal, userExam) {
   if (t.indexOf(u) !== -1 || u.indexOf(t) !== -1) return true; 
   return false;
 }
- 
+
 function getColIdx(headers, name) {
   for(var i=0; i<headers.length; i++) {
     if(String(headers[i]).replace(/\s/g,'').toLowerCase() === String(name).replace(/\s/g,'').toLowerCase()) return i;
   }
   return -1; 
 }
- 
+
 function formatDt(dt) {
   if (!(dt instanceof Date)) return String(dt);
   var d = dt.getDate(), m = dt.getMonth() + 1, y = dt.getFullYear();
@@ -124,7 +124,7 @@ function formatDt(dt) {
   var pad = function(n) { return n < 10 ? '0'+n : n; };
   return pad(d) + '/' + pad(m) + '/' + y + ', ' + pad(hr) + ':' + pad(min) + ':' + pad(sec);
 }
- 
+
 function outJSON(data) {
   var callback = String(_OUT_CALLBACK || "");
   if (callback && !/^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) callback = "";
@@ -141,8 +141,8 @@ function outJSON(data) {
     .createTextOutput(payload)
     .setMimeType(ContentService.MimeType.JSON);
 }
- 
- 
+
+
 function ensureQuestionBankSheet() {
   var sheet = ssForQuestions();
   return sheet;
@@ -168,7 +168,7 @@ function listQuestionPapers() {
   return Object.keys(out).sort();
 }
 function questionRowToArray(r) {
-  return [String(r[1]), Number(r[7]) || 0, String(r[2]||""), String(r[9]||""), [String(r[3]||""),String(r[10]||"")], [String(r[4]||""),String(r[11]||"")], [String(r[5]||""),String(r[12]||"")], [String(r[6]||""),String(r[13]||"")]];
+  return [String(r[1]), Number(r[7]) || 0, String(r[2]||""), String(r[9]||""), [String(r[3]||""),String(r[10]||"")], [String(r[4]||""),String(r[11]||"")], [String(r[5]||""),String(r[12]||"")], [String(r[6]||""),String(r[13]||"")], String(r[8]||"")];
 }
 function getProgrammeCourseCodes_() {
   var set = {};
@@ -328,6 +328,10 @@ function writeLoginIndexCache_(cache, out) {
   } catch (ignore2) {}
 }
 
+function normalizeRollKey_(roll) {
+  return String(roll || "").trim().toUpperCase();
+}
+
 // Fast login: only answers when the cached index has the student AND the password matches.
 // Anything else (cache miss, unknown roll, wrong password) falls through to the normal path,
 // so behaviour is identical - it just skips opening the spreadsheet.
@@ -337,7 +341,7 @@ function fastLoginFromCache_(e) {
   if (!idx) return null;
   var requestedRoll = String(e.parameter.roll || "").trim();
   var requestedPass = String(e.parameter.pass || "").trim();
-  var rec = idx[String(requestedRoll).toUpperCase()];
+  var rec = idx[normalizeRollKey_(requestedRoll)];
   if (!rec || String(rec.pass) !== requestedPass) return null;
   var reqForce = e.parameter.forceLogin, reqToken = e.parameter.deviceToken || "UNKNOWN_DEVICE";
   var sessionKey = "LOGIN_" + requestedRoll.toLowerCase() + "_" + String(rec.name || "").toLowerCase().replace(/\s+/g, '');
@@ -377,7 +381,7 @@ function getRegistrationLoginIndex_() {
     for(var i=1;i<vals.length;i++) {
       var roll=String(vals[i][rCol]||"").trim();
       if(!roll) continue;
-      var k=roll.toUpperCase();
+      var k=normalizeRollKey_(roll);
       if(out[k]) continue;
       var pass=pCol>=0?String(vals[i][pCol]||"").trim():"";
       if(!pass) pass="12345";
@@ -404,10 +408,10 @@ function invalidateRegistrationLoginIndex_() {
 function ssForLogin_() { return getMainSpreadsheet().getSheetByName("Registered Students"); }
 
 function getRegisteredStudentPasswordKey_(roll) {
-  return "REGISTERED_STUDENT_PASSWORD_" + String(roll || "").trim().toUpperCase();
+  return "REGISTERED_STUDENT_PASSWORD_" + normalizeRollKey_(roll);
 }
 function getRegisteredStudentChangedKey_(roll) {
-  return "REGISTERED_STUDENT_PASS_CHANGED_" + String(roll || "").trim().toUpperCase();
+  return "REGISTERED_STUDENT_PASS_CHANGED_" + normalizeRollKey_(roll);
 }
 function getRegisteredStudentPassword_(roll) {
   var r = String(roll || "").trim();
@@ -512,7 +516,7 @@ function doGet(e) {
   // Initialize the bound Student Google Sheet only once. Re-running all
   // sheet/header checks on every request was a major source of latency.
   ensureStudentSheetsOnce_(ss);
- 
+  
   if (action == "listPapers") {
     return outJSON({status:"SUCCESS", papers:listQuestionPapers()});
   }
@@ -532,7 +536,7 @@ function doGet(e) {
     props.setProperty('site_visits', visits.toString());
     return outJSON({status: "SUCCESS"});
   }
- 
+  
   if (action == "checkSession") {
     var rollStr = String(e.parameter.roll).trim().toLowerCase();
     var nameStr = String(e.parameter.name || "").trim().toLowerCase().replace(/\s+/g, '');
@@ -543,7 +547,7 @@ function doGet(e) {
     if (activeToken && activeToken !== reqToken) { return outJSON({status: "INVALID"}); }
     return outJSON({status: "VALID"});
   }
- 
+  
   if (action == "login") {
     // FAST LOGIN: do not download/loop through every student row.
     // Find the CISF number directly in the CISF NO column, then read only that row.
@@ -554,7 +558,7 @@ function doGet(e) {
     // New registration model: one Registered Students sheet for all courses.
     // Use a short-lived cached index so login does not scan the sheet on every attempt.
     var loginIndex = getRegistrationLoginIndex_();
-    var rec = loginIndex[String(requestedRoll).toUpperCase()];
+    var rec = loginIndex[normalizeRollKey_(requestedRoll)];
     if(rec && String(rec.pass) === requestedPass) {
       var reqForce=e.parameter.forceLogin, reqToken=e.parameter.deviceToken || "UNKNOWN_DEVICE";
       var sessionKey="LOGIN_"+requestedRoll.toLowerCase()+"_"+String(rec.name||"").toLowerCase().replace(/\s+/g,'');
@@ -620,7 +624,7 @@ function doGet(e) {
     }
     return outJSON({status: "FAIL"});
   }
- 
+  
   if (action == "getDashboard") {
     var roll = String(e.parameter.roll).trim();
     var name = e.parameter.name ? String(e.parameter.name).trim().toLowerCase() : "";
@@ -635,17 +639,17 @@ function doGet(e) {
       var schSheet = ss.getSheetByName("Schedule");
       if(schSheet && schSheet.getLastRow() > 1) {
          var sch = schSheet.getDataRange().getDisplayValues(); var sh = sch[0];
-         for(var i=1; i<sch.length; i++) { if(isMatch(sch[i][getColIdx(sh, "TargetExam")], eType)) res.schedule.push({name:sch[i][getColIdx(sh,"ExamName")], code:sch[i][getColIdx(sh,"PaperCode")], paperName:(getColIdx(sh,"PaperName")>=0?sch[i][getColIdx(sh,"PaperName")]:""), start:sch[i][getColIdx(sh,"StartTime")], end:sch[i][getColIdx(sh,"EndTime")], time:sch[i][getColIdx(sh,"Duration")]}); }
+         for(var i=1; i<sch.length; i++) { if(isMatch(sch[i][getColIdx(sh, "TargetExam")], eType)) res.schedule.push({name:sch[i][getColIdx(sh,"ExamName")], code:sch[i][getColIdx(sh,"PaperCode")], paperName:sch[i][getColIdx(sh,"PaperName")], target:sch[i][getColIdx(sh,"TargetExam")], start:sch[i][getColIdx(sh,"StartTime")], end:sch[i][getColIdx(sh,"EndTime")], duration:sch[i][getColIdx(sh,"Duration")]}); }
       }
       var modSheet = ss.getSheetByName("Modules");
       if(modSheet && modSheet.getLastRow() > 1) {
          var mod = modSheet.getDataRange().getDisplayValues(); var mh = mod[0];
-         for(var i=1; i<mod.length; i++) { if(isMatch(mod[i][getColIdx(mh, "TargetExam")], eType)) res.modules.push({name:mod[i][getColIdx(mh,"ModuleName")], code:mod[i][getColIdx(mh,"PaperCode")], paperName:(getColIdx(mh,"PaperName")>=0?mod[i][getColIdx(mh,"PaperName")]:""), time:mod[i][getColIdx(mh,"Duration")]}); }
+         for(var i=1; i<mod.length; i++) { if(isMatch(mod[i][getColIdx(mh, "TargetExam")], eType)) res.modules.push({name:mod[i][getColIdx(mh,"ModuleName")], code:mod[i][getColIdx(mh,"PaperCode")], paperName:mod[i][getColIdx(mh,"PaperName")], target:mod[i][getColIdx(mh,"TargetExam")], duration:mod[i][getColIdx(mh,"Duration")]}); }
       }
       var matSheet = ss.getSheetByName("Materials");
       if(matSheet && matSheet.getLastRow() > 1) {
          var mat = matSheet.getDataRange().getDisplayValues(); var math = mat[0];
-         for(var i=1; i<mat.length; i++) { if(isMatch(mat[i][getColIdx(math, "TargetExam")], eType)) res.materials.push({title:mat[i][getColIdx(math,"Title")], subject:mat[i][getColIdx(math,"Subject")], link:mat[i][getColIdx(math,"Link")]}); }
+         for(var i=1; i<mat.length; i++) { if(isMatch(mat[i][getColIdx(math, "TargetExam")], eType)) res.materials.push({title:mat[i][getColIdx(math,"Title")], subject:mat[i][getColIdx(math,"Subject")], target:mat[i][getColIdx(math,"TargetExam")], link:mat[i][getColIdx(math,"Link")]}); }
       }
       
       var permSheet = ss.getSheetByName("PermanentHistory");
@@ -666,20 +670,20 @@ function doGet(e) {
                   if(String(pData[j][prCol]).trim() == roll) {
                      var mapKey = String(pData[j][ppCol]).trim() + "_" + String(pData[j][ptCol]).trim();
                      if(!permStatusMap[mapKey]) {
-                         var dt = pData[j][pdCol]; if(dt instanceof Date) dt = formatDt(dt);
-                         permStatusMap[mapKey] = {
-                             date: dt, paper: String(pData[j][ppCol]).trim(),
-                             score: (pscoreCol !== -1) ? pData[j][pscoreCol] : "-",
-                             result: (presultCol !== -1) ? pData[j][presultCol] : "",
-                             type: String(pData[j][ptCol]).trim(),
-                             responses: (presCol !== -1) ? pData[j][presCol] || "" : ""
-                         };
+                        var dt = pData[j][pdCol]; if(dt instanceof Date) dt = formatDt(dt);
+                        permStatusMap[mapKey] = {
+                          date: dt, paper: String(pData[j][ppCol]).trim(),
+                          score: (pscoreCol !== -1) ? pData[j][pscoreCol] : "-",
+                          result: (presultCol !== -1) ? pData[j][presultCol] : "",
+                          type: String(pData[j][ptCol]).trim(),
+                          responses: (presCol !== -1) ? pData[j][presCol] || "" : ""
+                        };
                      }
                   }
               }
           }
       }
- 
+  
       var hisSheet = ss.getSheetByName("History");
       var seenMap = {};
       if(hisSheet && hisSheet.getLastRow() > 1) {
@@ -717,11 +721,11 @@ function doGet(e) {
           var rec = permStatusMap[key];
           if(String(rec.type).charAt(0) === "U") res.historyU.push(rec); else res.historyP.push(rec);
       }
- 
+  
     } catch(err) {}
     return outJSON(res);
   }
- 
+  
   if (action == "adminLogin") {
      var suppliedPass = String(e.parameter.pass || "").trim();
 
@@ -1104,18 +1108,18 @@ function doGet(e) {
         courseBatches[cbKey]++;
      });
      for(var key in courseBatches) { var parts = key.split("|||"); res.activeCourses.push({ courseName: parts[0], batch: parts[1], totalStudents: courseBatches[key] }); }
- 
+  
      var schSheet = ss.getSheetByName("Schedule");
      if(schSheet && schSheet.getLastRow() > 1) {
          var sch = schSheet.getDataRange().getDisplayValues(); var schH = sch[0];
-         for(var i=1; i<sch.length; i++) { res.activeSchedules.push({ name: sch[i][getColIdx(schH,"ExamName")], code: sch[i][getColIdx(schH,"PaperCode")], paperName:(getColIdx(schH,"PaperName")>=0?sch[i][getColIdx(schH,"PaperName")]:""), target: sch[i][getColIdx(schH,"TargetExam")], start: sch[i][getColIdx(schH,"StartTime")], end: sch[i][getColIdx(schH,"EndTime")] }); }
+         for(var i=1; i<sch.length; i++) { res.activeSchedules.push({ name: sch[i][getColIdx(schH,"ExamName")], code: sch[i][getColIdx(schH,"PaperCode")], paperName:(getColIdx(schH,"PaperName")>=0 ? sch[i][getColIdx(schH,"PaperName")] : ""), target: sch[i][getColIdx(schH,"TargetExam")] }); }
      }
      var modSheet = ss.getSheetByName("Modules");
      if(modSheet && modSheet.getLastRow() > 1) {
          var mod = modSheet.getDataRange().getDisplayValues(); var modH = mod[0];
-         for(var i=1; i<mod.length; i++) { res.activeModules.push({ name: mod[i][getColIdx(modH,"ModuleName")], code: mod[i][getColIdx(modH,"PaperCode")], paperName:(getColIdx(modH,"PaperName")>=0?mod[i][getColIdx(modH,"PaperName")]:""), target: mod[i][getColIdx(modH,"TargetExam")] }); }
+         for(var i=1; i<mod.length; i++) { res.activeModules.push({ name: mod[i][getColIdx(modH,"ModuleName")], code: mod[i][getColIdx(modH,"PaperCode")], paperName:(getColIdx(modH,"PaperName")>=0 ? mod[i][getColIdx(modH,"PaperName")] : ""), target: mod[i][getColIdx(modH,"TargetExam")] }); }
      }
- 
+  
      var hisSheet = ss.getSheetByName("History");
      if(hisSheet && hisSheet.getLastRow() > 1) {
        var his = hisSheet.getDataRange().getDisplayValues(); var head = his[0];
@@ -1126,7 +1130,7 @@ function doGet(e) {
           res.historyData.push(rowArray);
        }
      }
- 
+  
      var pSheet = ss.getSheetByName("PermanentHistory");
      if(pSheet && pSheet.getLastRow() > 1) {
        var pHis = pSheet.getDataRange().getDisplayValues(); var pHead = pHis[0];
@@ -1137,10 +1141,10 @@ function doGet(e) {
           res.permHistoryData.push(rowArray);
        }
      }
- 
+  
      return outJSON(res);
   }
- 
+  
   /* BATCH MANAGER: batch worksheets are kept in the Records spreadsheet. */
   if (action == "getAvailableBatches") {
     var batches = {}; var sheets = ss.getSheets();
@@ -1535,7 +1539,7 @@ function doGet(e) {
          for(var i=1; i<data.length; i++) {
              if(String(data[i][getColIdx(h, "CISF NO")]).trim() == roll) {
                  var dt = data[i][getColIdx(h,"Date")]; if(dt instanceof Date) dt = formatDt(dt);
-                 out.push({ date: dt, paper: data[i][getColIdx(h,"Paper")], score: data[i][getColIdx(h,"Score")], result: data[i][getColIdx(h,"Result")], type: data[i][getColIdx(h,"Type")], batch: bCol !== -1 ? data[i][bCol] : "N/A", responses: data[i][rCol] || "" });
+                 out.push({ date: dt, paper: data[i][getColIdx(h,"Paper")], score: data[i][getColIdx(h,"Score")], result: data[i][getColIdx(h,"Result")], type: data[i][getColIdx(h,"Type")], batch: bCol>=0?data[i][bCol]:"N/A", responses: data[i][rCol] || "" });
              }
          }
      }
@@ -1567,7 +1571,7 @@ function doGet(e) {
      }
      return outJSON({data: out});
   }
- 
+  
   if (action == "getUpdates") {
     var upSheet = ss.getSheetByName("QuestionUpdates"); var updates = {};
     if(upSheet && upSheet.getLastRow() > 0) {
@@ -1579,7 +1583,7 @@ function doGet(e) {
        }
     } return outJSON(updates);
   }
- 
+  
   if (action == "checkLock") {
     var roll = e.parameter.roll, paper = e.parameter.paper, paperName = String(e.parameter.paperName || "").trim(), type = e.parameter.type || "U", lockStatus = "UNLOCKED", hisSheet = ss.getSheetByName("History");
     var name = e.parameter.name ? String(e.parameter.name).trim().toLowerCase() : "";
@@ -1588,7 +1592,7 @@ function doGet(e) {
        for(var i=his.length-1; i>=1; i--) {
           var hRoll = String(his[i][getColIdx(hh,"CISF NO")]).trim();
           var hName = String(his[i][getColIdx(hh,"Name")]).trim().toLowerCase();
-          if(hRoll == String(roll) && (!name || hName === name) && his[i][getColIdx(hh,"Paper")] == paper && (!paperName || getColIdx(hh,"PaperName") < 0 || String(his[i][getColIdx(hh,"PaperName")]).trim() == paperName) && String(his[i][getColIdx(hh,"Type")]).trim() == String(type).trim()) {
+          if(hRoll == String(roll) && (!name || hName === name) && his[i][getColIdx(hh,"Paper")] == paper && (!paperName || getColIdx(hh,"PaperName") < 0 || String(his[i][getColIdx(hh,"PaperName")]).trim() === paperName) && String(his[i][getColIdx(hh,"Type")]).trim() === String(type).trim()) {
              if(his[i][getColIdx(hh,"Result")] == "LOCKED") lockStatus = "LOCKED"; break;
           }
        }
@@ -1596,7 +1600,7 @@ function doGet(e) {
      return ContentService.createTextOutput(lockStatus);
   }
 }
- 
+
 function appendByHeaders_(sheet, valuesMap) {
   var lastCol = Math.max(1, sheet.getLastColumn());
   var headers = sheet.getRange(1,1,1,lastCol).getDisplayValues()[0];
@@ -1616,6 +1620,30 @@ function ensureHeaderColumn_(sheet, headerName) {
   return idx;
 }
 
+function findExistingHistoryRow_(sheet, roll, name, paper, paperName) {
+  if (!sheet || sheet.getLastRow() <= 1) return -1;
+  var allData = sheet.getDataRange().getDisplayValues();
+  if (!allData || allData.length <= 1) return -1;
+  var head = allData[0] || [];
+  var rollCol = getColIdx(head, "CISF NO");
+  var nameCol = getColIdx(head, "Name");
+  var paperCol = getColIdx(head, "Paper");
+  var paperNameCol = getColIdx(head, "PaperName");
+  var cleanPaper = String(paper || "").split("###")[0].trim();
+  var cleanPaperName = String(paperName || "").trim();
+  var targetRoll = String(roll || "").trim();
+  var targetName = String(name || "").trim().toLowerCase();
+
+  for (var i = allData.length - 1; i >= 1; i--) {
+    if (rollCol >= 0 && String(allData[i][rollCol] || "").trim() !== targetRoll) continue;
+    if (nameCol >= 0 && targetName && String(allData[i][nameCol] || "").trim().toLowerCase() !== targetName) continue;
+    if (paperCol >= 0 && String(allData[i][paperCol] || "").trim() !== cleanPaper) continue;
+    if (paperNameCol >= 0 && cleanPaperName && String(allData[i][paperNameCol] || "").trim() !== cleanPaperName) continue;
+    return i + 1;
+  }
+  return -1;
+}
+
 function doPost(e) {
   var data;
   try {
@@ -1630,14 +1658,14 @@ function doPost(e) {
   // Performance: initialize the bound Student Google Sheet only once (same as doGet),
   // not on every POST. Re-checking all sheets/headers per request caused slow saves.
   ensureStudentSheetsOnce_(ss);
- 
+  
   if (data.action == "logout") {
       var rollStr = String(data.roll).trim().toLowerCase();
       var nameStr = String(data.name || "").trim().toLowerCase().replace(/\s+/g, '');
       CacheService.getScriptCache().remove("LOGIN_" + rollStr + "_" + nameStr);
       return ContentService.createTextOutput("LOGGED_OUT");
   }
- 
+  
   if (data.action == "forceLockStudent") {
      if(data.pass != getAdminPassword()) return ContentService.createTextOutput("FAIL");
      var hSheet = ss.getSheetByName("History");
@@ -1658,7 +1686,7 @@ function doPost(e) {
      }
      return ContentService.createTextOutput("NOT_FOUND");
   }
- 
+  
   if (data.action == "forceUnlockStudent") {
      if(data.pass != getAdminPassword()) return ContentService.createTextOutput("FAIL");
      var hSheet = ss.getSheetByName("History");
@@ -1679,7 +1707,7 @@ function doPost(e) {
      }
      return ContentService.createTextOutput("NOT_FOUND");
   }
- 
+  
   if (data.action == "forceEndStudent") {
      if(data.pass != getAdminPassword()) return ContentService.createTextOutput("FAIL");
      var hSheet = ss.getSheetByName("History");
@@ -1701,7 +1729,7 @@ function doPost(e) {
      }
      return ContentService.createTextOutput("NOT_FOUND");
   }
- 
+  
   if (data.action == "bulkLockUnlock") {
      if(data.pass != getAdminPassword()) return ContentService.createTextOutput("FAIL");
      var hSheet = ss.getSheetByName("History");
@@ -1729,7 +1757,7 @@ function doPost(e) {
      }
      return ContentService.createTextOutput("SUCCESS_" + count);
   }
- 
+  
   if (data.action == "endExamNow") {
      if(data.pass != getAdminPassword()) return ContentService.createTextOutput("FAIL");
      var typeSheetName = data.dataType; 
@@ -1741,7 +1769,7 @@ function doPost(e) {
          if(typeSheetName === "Schedule") {
              var eCol = getColIdx(sData[0], "EndTime") + 1;
              for(var i = sData.length-1; i>=1; i--) { 
-                 if(String(sData[i][cCol]).trim() === String(code).trim() && (!wantedPaperName || getColIdx(sData[0], "PaperName") < 0 || String(sData[i][getColIdx(sData[0], "PaperName")]).trim() === wantedPaperName)) { 
+                 if(String(sData[i][cCol]).trim() === String(code).trim() && (!wantedPaperName || getColIdx(sData[0], "PaperName") < 0 || String(sData[i][getColIdx(sData[0], "PaperName")]).trim() === wantedPaperName)) {
                      sheet.getRange(i+1, eCol).setValue(formatDt(new Date())); 
                  } 
              }
@@ -1755,7 +1783,7 @@ function doPost(e) {
      } 
      return ContentService.createTextOutput("SUCCESS");
   }
- 
+  
   if (data.action == "uploadRegisteredStudents") {
     invalidateRegistrationLoginIndex_();
     if(data.adminPass != getAdminPassword()) return outJSON({status:"FAIL", msg:"Wrong Admin Password"});
@@ -1889,7 +1917,7 @@ function doPost(e) {
       targetSheet.appendRow([data.roll, data.name, data.pass, data.batch, cType, "FALSE"]);
       return ContentService.createTextOutput("SUCCESS");
   }
- 
+  
   if (data.action == "unlockStudent") {
      if(data.pass != getAdminPassword()) return ContentService.createTextOutput("FAIL");
      var hSheet = ss.getSheetByName("History");
@@ -1911,7 +1939,7 @@ function doPost(e) {
      if(unlocked) return ContentService.createTextOutput("SUCCESS");
      return ContentService.createTextOutput("NOT_FOUND");
   }
- 
+  
   if (data.action == "changePassword") {
     var changeRoll = String(data.roll || "").trim();
     var regSheetForPass = ss.getSheetByName("Registered Students") || ensureRegisteredStudentsSheet_();
@@ -1983,47 +2011,43 @@ function doPost(e) {
         var dateCol = getColIdx(head,"Date")+1, rollCol = getColIdx(head,"CISF NO")+1, nameCol = getColIdx(head,"Name")+1;
         var paperCol = getColIdx(head,"Paper")+1, paperNameCol = getColIdx(head,"PaperName")+1, scoreCol = getColIdx(head,"Score")+1, resCol = getColIdx(head,"Result")+1, typeCol = getColIdx(head,"Type")+1;
         
-        var dateStr = formatDt(new Date()); var allData = hSheet.getDataRange().getValues(); var updateRow = -1;
+        var dateStr = formatDt(new Date()); var updateRow = findExistingHistoryRow_(hSheet, data.roll, data.name, data.paper, data.paperName);
         var cleanPaper = String(data.paper).split("###")[0].trim();
         var cleanPaperName = String(data.paperName || (String(data.paper).indexOf("###") !== -1 ? String(data.paper).split("###").slice(1).join("###") : "")).trim();
         var payloadName = String(data.name).trim().toLowerCase();
- 
-        for(var i = allData.length - 1; i >= 1; i--) {
-           var rowRoll = String(allData[i][rollCol-1]).trim();
-           var rowName = String(allData[i][nameCol-1]).trim().toLowerCase();
-           if(rowRoll == String(data.roll).trim() && rowName == payloadName && String(allData[i][paperCol-1]).trim() == cleanPaper && (paperNameCol <= 0 || String(allData[i][paperNameCol-1]).trim() == cleanPaperName) && String(allData[i][typeCol-1]).trim() == String(data.type).trim()) {
-              updateRow = i + 1; 
-              break; 
-           }
-        }
-        
         var finalScore = data.score || "-";
         var resultText = data.result;
         var responsesLog = data.responses || "";
         var rowToFormat; var appendedNewHistoryRow = false;
- 
+
         if(String(data.roll) === "ADMIN_TEST") { lock.releaseLock(); return ContentService.createTextOutput("Saved"); }
- 
+
         if(updateRow !== -1) { 
-           var existingRow = allData[updateRow - 1];
-           existingRow[dateCol-1] = dateStr;
-           existingRow[scoreCol-1] = finalScore;
-           existingRow[resCol-1] = resultText;
-           hSheet.getRange(updateRow, 1, 1, existingRow.length).setValues([existingRow]);
-           rowToFormat = updateRow;
+            var existingRow = hSheet.getRange(updateRow, 1, 1, head.length).getValues()[0];
+            existingRow[dateCol-1] = dateStr;
+            existingRow[scoreCol-1] = finalScore;
+            existingRow[resCol-1] = resultText;
+            if (paperCol > 0) existingRow[paperCol-1] = cleanPaper;
+            if (paperNameCol > 0) existingRow[paperNameCol-1] = cleanPaperName;
+            if (typeof data.type !== "undefined") existingRow[typeCol-1] = data.type;
+            hSheet.getRange(updateRow, 1, 1, existingRow.length).setValues([existingRow]);
+            rowToFormat = updateRow;
         } else {
-           var newRow = new Array(head.length).fill(""); 
-           newRow[dateCol-1] = dateStr; newRow[rollCol-1] = data.roll; newRow[nameCol-1] = data.name;
-           newRow[paperCol-1] = cleanPaper; if(paperNameCol > 0) newRow[paperNameCol-1] = cleanPaperName; newRow[scoreCol-1] = finalScore; newRow[resCol-1] = resultText; newRow[typeCol-1] = data.type; 
-           hSheet.appendRow(newRow); rowToFormat = hSheet.getLastRow(); appendedNewHistoryRow = true;
+            var newRow = new Array(head.length).fill(""); 
+            newRow[dateCol-1] = dateStr; newRow[rollCol-1] = data.roll; newRow[nameCol-1] = data.name;
+            newRow[paperCol-1] = cleanPaper; if(paperNameCol > 0) newRow[paperNameCol-1] = cleanPaperName; newRow[scoreCol-1] = finalScore; newRow[resCol-1] = resultText; newRow[typeCol-1] = data.type || "U"; 
+            if (data.batch) {
+              var batchColIdx = getColIdx(head, "Batch");
+              if (batchColIdx >= 0) newRow[batchColIdx] = data.batch;
+            }
+            hSheet.appendRow(newRow); rowToFormat = hSheet.getLastRow(); appendedNewHistoryRow = true;
         }
- 
+
         var cellColor = (resultText === "PASS") ? "green" : ((resultText === "FAIL" || resultText === "COMPLETED") ? "red" : "black");
         hSheet.getRange(rowToFormat, resCol).setFontColor(cellColor).setFontWeight("bold");
         
-        // Performance: an updated row keeps its CISF NO, so the sheet is already in order.
-        if(appendedNewHistoryRow && hSheet.getLastRow() >= 3) { hSheet.getRange(2, 1, hSheet.getLastRow() - 1, hSheet.getLastColumn()).sort(rollCol); }
- 
+        // Avoid global sorts on every submission. This was the main sheet performance bottleneck under heavy concurrent answers.
+        // The result is stored by the student's identifier and is not required to be resorted after each update.
         if(resultText == "PASS" || resultText == "FAIL" || resultText == "COMPLETED") {
             // Individual U-/P- result sheets intentionally disabled.
             // Results continue to be stored in History and PermanentHistory below.
@@ -2037,14 +2061,14 @@ function doPost(e) {
                 permSheet.getRange(1, 1, 1, 9).setBackground("#004d99").setFontColor("white").setFontWeight("bold"); 
                 SpreadsheetApp.flush();
             }
- 
+  
             ensureHeaderColumn_(permSheet,"PaperName");
             var pHdrs = permSheet.getRange(1, 1, 1, permSheet.getLastColumn()).getValues()[0];
             var batchIdx = getColIdx(pHdrs, "Batch");
             if (batchIdx === -1) { batchIdx = pHdrs.length; permSheet.getRange(1, batchIdx + 1).setValue("Batch"); pHdrs.push("Batch"); SpreadsheetApp.flush(); }
             var respIdx = getColIdx(pHdrs, "Responses");
             if (respIdx === -1) { respIdx = pHdrs.length; permSheet.getRange(1, respIdx + 1).setValue("Responses"); pHdrs.push("Responses"); SpreadsheetApp.flush(); }
- 
+
             var newPermRow = new Array(pHdrs.length).fill("");
             newPermRow[getColIdx(pHdrs, "Date")] = dateStr;
             newPermRow[getColIdx(pHdrs, "CISF NO")] = data.roll;
@@ -2061,8 +2085,6 @@ function doPost(e) {
             permSheet.appendRow(newPermRow);
             var permRow = permSheet.getLastRow(); 
             permSheet.getRange(permRow, 6).setFontColor(cellColor).setFontWeight("bold");
-            
-            if(permRow >= 3) { permSheet.getRange(2, 1, permRow - 1, permSheet.getLastColumn()).sort(2); } 
         }
     } catch(err) {
     } finally {
@@ -2071,7 +2093,7 @@ function doPost(e) {
     
     return ContentService.createTextOutput("Saved");
   }
- 
+
   if (data.action == "changeAdminPassword") {
      var currentPass = String(data.currentPass || "");
      var newPass = String(data.newPass || "");
@@ -2097,7 +2119,7 @@ function doPost(e) {
          }
      } return ContentService.createTextOutput("SUCCESS");
   }
- 
+
   if(data.action == "deleteBatchData") {
      if(data.pass != getAdminPassword()) return ContentService.createTextOutput("FAIL");
      var targetBatch = String(data.batch).trim();
@@ -2117,9 +2139,9 @@ function doPost(e) {
         }
      } return ContentService.createTextOutput("SUCCESS");
   }
- 
-  if (data.action == "updateNotice") { var sheet = ss.getSheetByName("Notices"); if(!sheet) { sheet = ss.insertSheet("Notices"); sheet.appendRow(["TargetExam", "NoticeText"]);} var nData = sheet.getDataRange().getValues(); var row = -1; for(var i=1; i<nData.length; i++) { if(nData[i][0] == data.target) { row = i+1; break; } } if(row !== -1) { sheet.getRange(row, 2).setValue(data.text); } else { sheet.appendRow([data.target, data.text]); } return ContentService.createTextOutput("SUCCESS"); }
-  if (data.action == "updateQuestion") { var upSheet = ss.getSheetByName("QuestionUpdates"); if(!upSheet) upSheet = ss.insertSheet("QuestionUpdates"); var allD = upSheet.getDataRange().getValues(); var updateRow = -1; for(var i=0; i<allD.length; i++) { if(allD[i][0] == data.pCode && String(allD[i][1]) == String(data.qId)) { updateRow = i + 1; break; } } var rowData = [data.pCode, data.qId, data.qEn, data.qHi, data.oaEn, data.oaHi, data.obEn, data.obHi, data.ocEn, data.ocHi, data.odEn, data.odHi, data.correct]; if(updateRow !== -1) { upSheet.getRange(updateRow, 1, 1, rowData.length).setValues([rowData]); } else { upSheet.appendRow(rowData); } return ContentService.createTextOutput("SUCCESS"); }
+  
+  if (data.action == "updateNotice") { var sheet = ss.getSheetByName("Notices"); if(!sheet) { sheet = ss.insertSheet("Notices"); sheet.appendRow(["TargetExam", "NoticeText"]);} var nData = sheet.getDataRange().getValues(); var target = String(data.target || "").trim(); var note = String(data.notice || ""); var exists = false; var targetCol = getColIdx(nData[0], "TargetExam"); var textCol = getColIdx(nData[0], "NoticeText"); for(var i=1;i<nData.length;i++){ if(String(nData[i][targetCol]).trim()===target){ sheet.getRange(i+1, textCol+1).setValue(note); exists=true; break; } } if(!exists) sheet.appendRow([target,note]); return ContentService.createTextOutput("SUCCESS"); }
+  if (data.action == "updateQuestion") { var upSheet = ss.getSheetByName("QuestionUpdates"); if(!upSheet) upSheet = ss.insertSheet("QuestionUpdates"); var allD = upSheet.getDataRange().getValues(); var paper = String(data.paperCode || "").trim(); var qid = String(data.qid || "").trim(); var exists = false; for(var i=1;i<allD.length;i++){ if(String(allD[i][0]).trim()===paper && String(allD[i][1]).trim()===qid){ upSheet.getRange(i+1,1,1,allD[0].length).setValues([ [paper,qid,data.questionEn || "",data.questionHi || "",data.aEn || "",data.aHi || "",data.bEn || "",data.bHi || "",data.cEn || "",data.cHi || "",data.dEn || "",data.dHi || "",data.correct || ""] ]); exists=true; break; } } if(!exists){ upSheet.appendRow([paper,qid,data.questionEn || "",data.questionHi || "",data.aEn || "",data.aHi || "",data.bEn || "",data.bHi || "",data.cEn || "",data.cHi || "",data.dEn || "",data.dHi || "",data.correct || ""]); } return ContentService.createTextOutput("SUCCESS"); }
   if (data.action == "clearUpdates") { var upSheet = ss.getSheetByName("QuestionUpdates"); if(upSheet) upSheet.clear(); return ContentService.createTextOutput("SUCCESS"); }
   if (data.action == "addSchedule") {
      var sheet = ss.getSheetByName("Schedule");
@@ -2135,7 +2157,11 @@ function doPost(e) {
      appendByHeaders_(sheet, {ModuleName:data.name, PaperCode:data.code, PaperName:data.paperName || "", TargetExam:data.target, Duration:data.duration});
      return ContentService.createTextOutput("SUCCESS");
   }
-  if (data.action == "addMaterial") { var sheet = ss.getSheetByName("Materials"); if(!sheet) {sheet = ss.insertSheet("Materials"); sheet.appendRow(["Title", "Subject", "TargetExam", "Link"]);} sheet.appendRow([data.title, data.sub, data.target, data.link]); return ContentService.createTextOutput("SUCCESS"); }
+  if (data.action == "addMaterial") { var sheet = ss.getSheetByName("Materials"); if(!sheet) {sheet = ss.insertSheet("Materials"); sheet.appendRow(["Title", "Subject", "TargetExam", "Link"]);} sheet.appendRow([data.title, data.subject || "", data.target || "", data.link || ""]); return ContentService.createTextOutput("SUCCESS"); }
+
+  return ContentService.createTextOutput("UNKNOWN_ACTION");
 }
+
+
 
 
