@@ -1,0 +1,27 @@
+FINAL SYNTAX FIX TEST REPORT
+============================
+Student backend syntax checked with Node.js --check after correcting the BATCH NAME migration expression.
+Frontend INDEX.html: all 4 script blocks passed Node.js --check.
+Paper backend was not changed.
+ZIP integrity checked with unzip -t.
+
+Student Registered Students columns:
+Serial Number | CISF NO | Rank | Name | Paper Code | Batch Name | Password | PassChanged
+
+New registrations initialize Password=12345 and PassChanged=FALSE.
+Changed passwords are stored in Password and PassChanged=TRUE.
+
+Hindi validation fix: validates Question Hindi and A/B/C/D Hindi during the same browser parsing pass; no extra network request added.
+
+PERFORMANCE OPTIMIZATION VALIDATION - 25 Sep 2026
+-------------------------------------------------
+- Frontend JavaScript syntax: PASS (Node.js)
+- Student backend syntax: PASS (Node.js)
+- Paper backend syntax: PASS (Node.js after UTF-16 decode)
+- Exam paper loading path: changed to one getExamPaper request for normal assigned papers
+- Dashboard polling: reduced from 5 seconds to 60 seconds
+- Exam local state writes: reduced from every second to immediate-on-action + 10-second periodic save
+- Paper catalog/question cache: added with cache invalidation after upload/remove
+- Student backend initialization: changed to one-time readiness check
+- Student login: changed to CISF TextFinder + single-row read for Registered Students
+- Live Google Apps Script / multi-device concurrency: NOT executable from this local test environment

@@ -1,0 +1,46 @@
+ASTI EXAM PORTAL - LOGIN SPEED + "FAILED TO UPDATE" FIX
+=====================================================
+No exam logic, scoring, resume, sheet structure or UI was changed. Only speed/reliability.
+
+STUDENT BACKEND (STUDENT_GOOGLE_SHEET_BACKEND.gs)
+1. Every POST (password change, result save, logout) re-checked ALL sheets and headers.
+   Now it runs once only (same as GET). Biggest cause of slow saves / "failed to update".
+2. Login cache: the student list was stored in ONE cache entry. Google limits an entry to
+   ~100 KB, so for a large list the save silently failed and EVERY login scanned the whole sheet.
+   Now it is stored in chunks (tested with 5000 students) and kept for 5 minutes.
+3. Only one request rebuilds the login cache; others wait and reuse it.
+4. Login and session check are answered from cache BEFORE opening the spreadsheet.
+   Wrong password / unknown roll / cache miss still use the original path.
+5. Password change: reads only the CISF NO column (not the whole sheet), and uses a lock so
+   two changes at once cannot collide.
+6. Result save: the History sheet is sorted only when a NEW row is added. An updated row keeps
+   its CISF NO, so the order is identical. (PermanentHistory sort left as it was.)
+7. New "warmup" action + optional warmStudentBackend() function.
+
+FRONTEND (INDEX.html)
+1. Login and password change retry automatically (up to 3 tries, 25-30 s timeout) on slow or
+   failed responses. The button label is restored if it still fails.
+2. Portal wakes the backend and builds the login cache as soon as the page opens.
+3. Session check every 45 s instead of 15 s (much less load with many students).
+
+IMAGES: same file names, about 2.7 MB reduced to about 0.5 MB total.
+
+DEPLOY
+1. Student Apps Script: replace code with STUDENT_GOOGLE_SHEET_BACKEND.gs, Save,
+   Deploy > Manage deployments > Edit > New version > Deploy (same URL).
+2. Paper Apps Script: no change needed.
+3. Upload the whole folder to Netlify (INDEX.html + all images).
+4. OPTIONAL: Apps Script > Triggers > Add trigger > warmStudentBackend > Time-driven >
+   every 5 minutes. Keeps login instant at exam start.
+5. Test: login, change password, start exam, submit, check History.
+
+UPDATE 2 - MOBILE EXAM HEADER
+- Student exam (mobile): "ASTI BANGALORE" and the Name | CISF NO line could overlap each other and the
+  Hindi/English button. Both lines now stack normally, scale to the screen width, and a long name wraps
+  instead of being cut off. Only the last mobile header CSS block (FINAL_ASTI_CENTER_PREMIUM_NAME_CISF)
+  was edited. No other exam design or logic was touched.
+
+UPDATE 3 - PULL-TO-REFRESH GUARD (exam page)
+- Swiping down at the top of the screen on a phone reloads the page. During an exam this unloads the page,
+  the browser marks the exam LOCKED, and the next start shows "Previous unfinished session found".
+  Added one CSS rule (overscroll-behavior) so the swipe no longer reloads the page. No JavaScript changed.

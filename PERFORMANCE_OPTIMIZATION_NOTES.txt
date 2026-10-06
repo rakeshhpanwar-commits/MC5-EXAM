@@ -1,0 +1,78 @@
+ASTI EXAM PORTAL - PERFORMANCE OPTIMIZED PACKAGE
+================================================
+
+Purpose
+-------
+This package is based on the user's existing dashboard/header package. The visual
+layout and exam logic were kept intact; only performance-related changes were made.
+
+Main performance fixes
+----------------------
+1. Student dashboard background polling changed from every 5 seconds to once per minute.
+   Manual Refresh Data and login refresh remain available.
+2. Exam local recovery state is no longer written to localStorage every second.
+   It is saved immediately after important exam actions and periodically every 10 seconds.
+3. Exam paper loading now uses a single getExamPaper request for a normal assigned paper,
+   instead of first downloading the full paper catalog and then downloading the paper.
+4. A single lightweight retry is used only when the exam-paper network request itself fails.
+5. Paper catalog is cached in the Paper Apps Script for 5 minutes.
+6. Question-paper data is cached per paper for 5 minutes when the response is small enough
+   for Apps Script CacheService. Uploaded/removed papers invalidate the relevant cache.
+7. Paper-sheet/header initialization is no longer performed on every Paper backend request.
+   It is performed once and then marked ready.
+8. Student-sheet/header initialization is no longer performed on every Student backend request.
+   It is performed once and then marked ready.
+9. Student login now finds the CISF number with TextFinder and reads only the matching row,
+   instead of downloading the entire Registered Students sheet for every login.
+
+Important behavior
+------------------
+- The resume feature has NOT been removed.
+- If a browser/device genuinely reloads, closes, or leaves an unfinished exam, the portal can
+  still show the Previous Unfinished Session prompt. That is intentional recovery behavior.
+- The optimization reduces unnecessary localStorage writes and network/Google Sheet work;
+  it does not disable exam recovery or security locking.
+- No question format, Hindi/English columns, paper-code names, scoring logic, pass mark,
+  registration format, or Google Sheet structure was intentionally changed.
+
+Deployment
+----------
+A) Frontend / Netlify
+   Replace the existing INDEX.html with the INDEX.html from this package.
+   Keep the existing Apps Script URLs in the file unchanged.
+
+B) Student Google Apps Script
+   Replace the Student backend code with STUDENT_GOOGLE_SHEET_BACKEND.gs.
+   Save the project.
+   Run setupStudentBackend() once from the correct Student Google Sheet-bound Apps Script.
+   Deploy/redeploy the Web App as the same deployment used by the portal.
+
+C) Paper Google Apps Script
+   Replace the Paper backend code with PAPER_GOOGLE_SHEET_BACKEND.gs.
+   Save the project.
+   Run setupPaperBackend() once from the correct Paper Google Sheet-bound Apps Script.
+   Deploy/redeploy the Web App as the same deployment used by the portal.
+
+Testing checklist
+-----------------
+1. Student login.
+2. Dashboard opens.
+3. Attempt/Practice module opens without the catalog-request delay.
+4. Questions load with English + Hindi options.
+5. Select answer -> Next -> Previous.
+6. Mark for review.
+7. Refresh/close during an unfinished exam -> Resume prompt still appears.
+8. Resume restores the saved position/answers.
+9. Submit exam -> result saved.
+10. Completed exam cannot be accidentally re-entered according to the existing logic.
+11. Admin paper list/catalog still loads.
+12. Paper upload/remove still works and refreshes the paper cache.
+
+Validation performed locally
+----------------------------
+- INDEX.html inline JavaScript syntax checked with Node.js.
+- Student backend JavaScript syntax checked with Node.js.
+- Paper backend JavaScript syntax checked with Node.js after UTF-16 decoding.
+- Original visual/dashboard assets were retained.
+- The package was not tested against a live Google Apps Script deployment from this environment,
+  so live multi-device concurrency and real Google Sheet latency cannot be certified here.

@@ -1,0 +1,24 @@
+ASTI EXAM PORTAL - LOGIN + EXAM LOADING FIX
+
+Changes in this package:
+1. Student login uses a 60-second cached CISF registration index instead of TextFinder/sheet scan on every login.
+2. Registration cache is invalidated after batch upload, batch deletion, manual add student, and password change.
+3. Exam loading first tries the optimized getExamPaper endpoint.
+4. If the deployed Paper Apps Script is an older version without getExamPaper, the portal automatically falls back to the existing getPaperCatalog/getQuestionPaper path.
+5. Paper backend source has been normalized to UTF-8 for safer copy/paste into Apps Script.
+6. Resume/local exam state and scoring logic are unchanged.
+7. Dashboard/header appearance is unchanged.
+
+IMPORTANT DEPLOYMENT:
+- Update BOTH Student Google Apps Script and Paper Google Apps Script from this package.
+- Deploy each as a new web-app version using the SAME existing web-app URLs if possible.
+- Keep the existing Google Spreadsheet bindings and IDs.
+- Do not create a new Student or Paper spreadsheet.
+
+TEST ORDER:
+A. Test one student login with default password.
+B. Confirm dashboard loads.
+C. Click START EXAM and confirm questions open.
+D. Answer 2-3 questions, refresh/close, and verify resume prompt still appears.
+E. Complete a test exam and verify result.
+F. Test a second student/device.

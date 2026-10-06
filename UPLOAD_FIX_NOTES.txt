@@ -1,0 +1,15 @@
+REGISTERED STUDENTS PASSWORD LOGIC FIX
+
+The Registered Students sheet now contains 8 columns:
+Serial Number | CISF NO | Rank | Name | Paper Code | Batch Name | Password | PassChanged
+
+New registration behavior:
+- Admin Excel upload contains Serial Number, CISF NO, Rank, Name only.
+- Batch Name comes from the Batch Name field in the portal.
+- Paper Code comes from the selected Paper Code dropdown.
+- New students receive initial password 12345 and PassChanged=FALSE.
+- First successful login with 12345 shows the one-time password-change screen.
+- New password is written to Password and PassChanged becomes TRUE.
+- Re-uploading a batch preserves a student's existing changed password/state.
+- Existing 6-column Registered Students sheets are migrated to 8 columns automatically.
+- The Registered Students sheet is the authoritative registration/login source.
